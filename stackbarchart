@@ -1,0 +1,107 @@
+window.onload = function () {
+    let request = new XMLHttpRequest();
+    request.open('get', "https://vega.github.io/vega-lite/examples/data/barley.json");
+    request.send(null);
+    request.onload = function () {
+        const data = JSON.parse(request.responseText);
+
+        const arr = [];
+        for (let i = 0; i < data.length; i++) {
+            let b = false;
+            for (let j = 0; j < arr.length; j++) {
+                if (arr[j].name == data[i].variety) {
+                    if (arr[j][data[i].site] == undefined) {
+                        arr[j][data[i].site] = 0;
+                    }
+                    arr[j][data[i].site] += data[i].yield;
+                    b = true;
+                    break;
+                }
+            }
+            if (b == false) {
+                arr.unshift({ name: data[i].variety });
+                arr[0][data[i].site] = data[i].yield;
+            }
+        }
+        arr.columns = ['name', 'University Farm', 'Waseca', 
+        'Morris', 'Crookston', 'Grand Rapids', 'Duluth'];
+
+        for (let i = 0; i < arr.length; i++) {
+            arr[i].total = 0;
+            for (j in arr.columns) {
+                if (arr.columns[j] != 'name') {
+                    arr[i].total += arr[i][arr.columns[j]];
+                }
+            }
+        }
+
+        console.log(arr);
+
+        const series = d3.stack()
+            .keys(arr.columns.slice(1))(arr)
+            .map(d => (d.forEach(v => v.key = d.key), d));
+
+        const color = d3.scaleOrdinal()
+            .domain(series.map(d => d.key))
+            .range(d3.schemeSpectral[series.length])
+            .unknown("#66ffcc");
+
+        const svg = d3.select('#mainshow');
+
+        const legend = svg.selectAll(".legend")
+            .data(arr.columns.slice(1))
+            .enter().append("g")
+            .attr("class", "legend")
+            .attr("transform", (d, i) => { return "translate(-30,"+(i*20+30)+")";}); 
+
+        legend.append("rect")
+            .attr("x", 910) 
+            .attr("y", 8)
+            .attr("width", 20)
+            .attr("height", 10) 
+            .style("fill", d => color(d));
+
+        legend.append("text")
+            .attr("x", 900)
+            .attr("y", 15)
+            .style("text-anchor", "end")
+            .text(d => d);
+
+        const xScale = d3.scaleLinear()
+            .domain([0, 500])
+            .range([0, 600]);
+
+        const yScale = d3.scaleBand()
+            .domain(arr.map(d => d.name))
+            .range([0, 400])
+            .padding(0.1);
+
+        const g = svg.append('g')
+            .attr('id', 'maingroup')
+            .attr('transform', 'translate(130,50)');
+
+        const yAxis = d3.axisLeft(yScale);
+        g.append('g').call(yAxis);
+
+        const xAxis = d3.axisTop(xScale);
+        g.append('g').call(xAxis);
+
+        const p = g.selectAll('.bar')
+            .data(series)
+            .enter()
+            .append('g')
+            .attr('class', 'bar')
+            .attr('fill', d => color(d.key))
+            .selectAll('rect')
+            .data(d => d)
+            .enter()
+            .append('rect')
+            .attr('width', d => xScale(d[1]) - xScale(d[0]))
+            .attr('height', yScale.bandwidth())
+            .attr("y", (d, i) => yScale(d.data.name))
+            .attr('x', d => xScale(d[0]))
+            .append('title');
+
+        d3.selectAll('.tick text').attr('font-size', '1.5em');
+    }
+}
