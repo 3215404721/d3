@@ -1,0 +1,137 @@
+window.onload = function() {
+const request = new XMLHttpRequest();
+request.open('get','https://vega.github.io/vega-lite/examples/data/cars.json')
+request.send(null);
+request.onload = function(){
+    console.log('||||||||');
+    const rawData = JSON.parse(this.responseText);
+
+    function getData(keyword,min,max,cols){
+        const res = [];
+        const step = (max - min)/cols;
+        for(let i = 0;i < cols;i++){
+            res.push({ind:i,europe:0,japan:0,usa:0});
+        }
+        res.columns = ['ind','europe','japan','usa'];
+        rawData.forEach(element => {
+            let origin = element["Origin"].toLowerCase();
+            let value = element[keyword];
+            let ind = Math.floor((value-min)/step);
+            if(res[ind] != null) res[ind][origin]++;
+        });
+        const series = d3.stack()
+            .keys(res.columns.slice(1))(res)
+            .map(d => (d.forEach(v => v.key = d.key), d));
+        return series;
+    }
+
+    const color = function(d){
+        switch(d){
+            case 'usa':
+                return '#be4757';
+            case 'japan':
+                return '#e47012';
+            case 'europe':
+                return '#373c85';
+        }
+    }
+
+    const mainshow = d3.select("#mainshow");
+
+    const chart1 = mainshow.append('g').attr('transform','translate(0,0)');
+    const chart2 = mainshow.append('g').attr('transform','translate(330,0)');
+    const chart3 = mainshow.append('g').attr('transform','translate(0,330)');
+    const chart4 = mainshow.append('g').attr('transform','translate(330,330)');
+
+    function setAxes(svg,keyword,min,max,cols,sup,ticks){
+        const series = getData(keyword,min,max,cols);
+
+        const g = svg.append('g')
+            .attr('class', 'mainshow')
+            .attr('transform', 'translate(80,20)');
+
+        const yScale = d3.scaleLinear()
+            .domain([0,sup])
+            .range([250, 0]);
+
+        const xScale = d3.scaleLinear()
+            .domain([min, max])
+            .range([0, 250]);
+
+        const yAxis = d3.axisLeft(yScale).ticks(ticks);
+        g.append('g').call(yAxis).selectAll('.tick').append('line')
+            .attr('x2','250')
+            .attr('stroke','#aaa5a6');
+
+        const xAxis = d3.axisBottom(xScale);
+        g.append('g').call(xAxis).attr('transform','translate(0,250)')
+            .append('line')
+            .attr('x1','250')
+            .attr('x2','250')
+            .attr('y1','0')
+            .attr('y2','-250')
+            .attr('stroke','#aaa5a6');
+
+        console.log(series);
+
+        const p = g.selectAll('.bar')
+            .data(series)
+            .enter()
+            .append('g')
+            .attr('class', 'bar')
+            .attr('fill', d => color(d.key))
+            .selectAll('rect')
+            .data(d => d)
+            .enter()
+            .append('rect')
+            .attr("x", (d, i) => xScale(min+i*(max-min)/cols)+1)
+            .attr("y", d => yScale(d[1]))
+            .attr("height", d => yScale(d[0]) - yScale(d[1]))
+            .attr("width", (d, i) => 250/cols - 2)
+            .append('title');
+        
+        svg.append("text")
+            .attr('transform','rotate(-90)')
+            .attr('x',-160)
+            .attr('y',30)
+            .attr('style','font-weight:bold')
+            .attr('font-family','sans-serif')
+            .style('text-anchor','middle')
+            .text('Count of Records');
+
+        svg.append('text')
+            .attr('x',200)
+            .attr('y',310)
+            .attr('style','font-weight:bold')
+            .attr('font-family','sans-serif')
+            .style('text-anchor','middle')
+            .text(keyword + '(binned)');
+    }
+    setAxes(chart1,'Horsepower',40,240,10,120,6);
+    setAxes(chart2,'Miles_per_Gallon',5,50,9,100,5);
+    setAxes(chart3,'Acceleration',8,26,9,120,6);
+    setAxes(chart4,'Displacement',50,500,9,100,5);
+    
+    d3.selectAll('.tick text').attr('font-size', '1.3em');
+
+    const pl = mainshow.append('g').attr('transform','translate(700,0)');
+
+    const legend = pl.selectAll(".legend")
+        .data(['Europe','Japan','Usa'])
+        .enter().append("g")
+        .attr("class", "legend")
+        .attr("transform", (d, i) => { return "translate(0,"+(i*20+30)+")";}); 
+
+    legend.append("rect")
+        .attr("x", 5) 
+        .attr("y", 8)
+        .attr("width", 12)
+        .attr("height", 12) 
+        .style("fill", d => color(d.toLowerCase()));
+
+    legend.append("text")
+        .attr("x", 20)
+        .attr("y", 20)
+        .text(d => d);
+}
+}
